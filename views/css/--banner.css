@@ -1,0 +1,118 @@
+/* Prevent page scrolling issues */
+html, body {
+    overflow-x: hidden;
+}
+
+/* Banner Container */
+#custom-popup-banner {
+    display: block; /* Ensure banner is visible by default */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 10000; /* High z-index to stay above other content */
+    box-sizing: border-box;
+}
+
+/* Inner Container */
+.custom-popup-container {
+    padding: 10px 20px;
+    text-align: center;
+    overflow: hidden;
+    box-sizing: border-box;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+/* Inherit colors from inline styles */
+.custom-popup-container,
+.custom-popup-container p,
+.custom-popup-container span,
+.custom-popup-container div {
+    color: inherit !important;
+}
+
+/* Close Button */
+.custom-popup-close {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+    font-weight: bold;
+    transition: opacity 0.3s;
+}
+
+.custom-popup-close:hover {
+    opacity: 0.7;
+}
+
+/* Marquee Animation */
+.popup-marquee {
+    white-space: nowrap;
+    overflow: hidden;
+    box-sizing: border-box;
+    display: inline-block;
+    width: 100%;
+    animation: marquee 20s linear infinite;
+}
+
+.popup-marquee span {
+    display: inline-block;
+    padding-left: 100%; /* Start off-screen */
+    color: inherit !important;
+}
+
+@keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+
+.popup-marquee p,
+.popup-marquee span {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    color: inherit !important;
+}
+
+/* Non-Marquee Content */
+.custom-popup-content {
+    padding: 5px;
+}
+
+.custom-popup-content span {
+    display: inline-block;
+    color: inherit !important;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    #custom-popup-banner {
+        padding: 0 10px;
+    }
+
+    .custom-popup-container {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+
+    .custom-popup-close {
+        font-size: 20px;
+        right: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .custom-popup-container {
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+
+    .custom-popup-close {
+        font-size: 18px;
+        right: 10px;
+    }
+}
