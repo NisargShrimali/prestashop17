@@ -1,0 +1,287 @@
+/* Prevent page scrolling */
+html, body {
+    overflow-x: hidden;
+}
+
+/* === Banner Styles === */
+#custom-popup-modal {
+    display: none;
+    position: relative;
+    z-index: 1000;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.custom-popup-container {
+    padding: 10px 20px;
+    text-align: center;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.custom-popup-container,
+.custom-popup-container p,
+.custom-popup-container span,
+.custom-popup-container div {
+    color: inherit !important;
+}
+
+.custom-popup-close {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 30px;
+    line-height: 1;
+}
+
+.banner-content {
+    color: inherit !important;
+}
+
+.popup-marquee {
+    white-space: nowrap;
+    overflow: hidden;
+    box-sizing: border-box;
+    display: inline-block;
+    animation: marquee 20s linear infinite;
+    padding-left: 100%;
+    color: inherit !important;
+}
+
+@keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+
+.popup-marquee p,
+.popup-marquee span {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    color: inherit !important;
+}
+
+/* Banner Responsive Adjustments */
+@media (max-width: 768px) {
+    #custom-popup-modal {
+        max-width: 100%;
+        padding: 0 10px;
+    }
+
+    .custom-popup-container {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+
+    .custom-popup-close {
+        font-size: 24px;
+        top: 50%;
+        transform: translateY(-50%);
+        right: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .custom-popup-container {
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+
+    .custom-popup-close {
+        font-size: 20px;
+        right: 10px;
+    }
+}
+
+#custom-popup-modal.active {
+    display: block;
+}
+
+/* === Info Popup Styles === */
+.custom-info-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    display: none;
+}
+
+.popup-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1;
+}
+
+.popup-content {
+    position: relative;
+    margin: 5% auto;
+    padding: 20px;
+    z-index: 2;
+    border-radius: 5px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.popup-content h2 {
+    margin: 0 0 15px;
+    font-size: 24px;
+    color: #333;
+    text-align: left;
+}
+
+.popup-content.small {
+    width: 90%;
+    max-width: 400px;
+}
+
+.popup-content.medium {
+    width: 90%;
+    max-width: 600px;
+}
+
+.popup-content.large {
+    width: 90%;
+    max-width: 800px;
+}
+
+.popup-content.shadow {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.custom-info-popup .popup-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #333;
+}
+
+/* Layout for image and content */
+.popup-inner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.popup-image-wrapper {
+    flex: 0 0 40%;
+    max-width: 40%;
+}
+
+.popup-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+.popup-content-wrapper {
+    flex: 1;
+}
+
+.popup-body {
+    color: #333;
+    line-height: 1.6;
+}
+
+.popup-body p {
+    margin: 0 0 10px;
+}
+
+/* === Custom Pure CSS Animations for Popups === */
+@keyframes popupFade {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes popupSlide {
+    0% { transform: translateY(-50px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes popupZoom {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.popup-animate-fade {
+    animation: popupFade 0.5s ease-out;
+}
+
+.popup-animate-slide {
+    animation: popupSlide 0.5s ease-out;
+}
+
+.popup-animate-zoom {
+    animation: popupZoom 0.5s ease-out;
+}
+
+/* Popup Responsive Adjustments */
+@media (max-width: 768px) {
+    .popup-content {
+        margin: 10% auto;
+        padding: 15px;
+    }
+
+    .popup-content.large,
+    .popup-content.medium,
+    .popup-content.small {
+        width: 90%;
+        max-width: 95%;
+    }
+
+    .popup-content h2 {
+        font-size: 20px;
+    }
+
+    .custom-info-popup .popup-close {
+        font-size: 20px;
+        right: 10px;
+    }
+
+    /* Stack image and content vertically on smaller screens */
+    .popup-inner {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .popup-image-wrapper {
+        flex: 0 0 100%;
+        max-width: 100%;
+        text-align: center;
+    }
+
+    .popup-content-wrapper {
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .popup-content {
+        padding: 10px;
+    }
+
+    .popup-content h2 {
+        font-size: 18px;
+    }
+
+    .custom-info-popup .popup-close {
+        font-size: 18px;
+    }
+
+    .popup-body {
+        font-size: 14px;
+    }
+}
