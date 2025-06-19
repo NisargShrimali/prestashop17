@@ -137,7 +137,7 @@ class AdminCustomPopupController extends ModuleAdminController
 
     public function processPreview()
     {
-        $id = (int)Tools::getValue('previewcustompopup_info'); // Changed to match the URL parameter
+        $id = (int)Tools::getValue('previewcustompopup_info');
 
         // Debug: Log the ID being requested
         file_put_contents(_PS_ROOT_DIR_ . '/var/logs/preview_debug.log', "Preview ID: $id\n", FILE_APPEND);
@@ -164,64 +164,154 @@ class AdminCustomPopupController extends ModuleAdminController
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Popup Preview</title>
                 <style>
-                    body { 
-                        margin: 0; 
-                        font-family: Arial, sans-serif; 
-                        display: flex; 
-                        justify-content: center; 
-                        align-items: center; 
-                        height: 100vh; 
-                        background: #f0f0f0; 
+                    body {
+                        margin: 0;
+                        font-family: Arial, sans-serif;
+                        background: rgba(0, 0, 0, 0.5);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        overflow: auto;
                     }
-                    .popup-container { 
-                        position: relative; 
-                        background-color: ' . htmlspecialchars($popup->background_color, ENT_QUOTES, 'UTF-8') . '; 
-                        padding: 20px; 
-                        border-radius: 8px; 
-                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); 
-                        max-width: ' . ($popup->modal_size === 'small' ? '400px' : ($popup->modal_size === 'medium' ? '600px' : '800px')) . '; 
-                        width: 100%; 
-                        box-sizing: border-box; 
+                    .popup-overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.6);
+                        z-index: 999;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
                     }
-                    .popup-content { 
-                        text-align: center; 
-                        color: #333; 
+                    .popup-container {
+                        position: relative;
+                        background-color: ' . htmlspecialchars($popup->background_color ?: '#ffffff', ENT_QUOTES, 'UTF-8') . ';
+                        padding: 30px;
+                        border-radius: 10px;
+                        box-shadow: ' . ($popup->background_shadow ? '0 6px 12px rgba(0, 0, 0, 0.3)' : 'none') . ';
+                        max-width: ' . ($popup->modal_size === 'small' ? '600px' : ($popup->modal_size === 'medium' ? '800px' : '1000px')) . ';
+                        width: 90%;
+                        box-sizing: border-box;
+                        z-index: 1000;
+                        overflow: auto;
+                        max-height: 90vh;
+                        display: flex;
+                        flex-wrap: wrap;
+                        align-items: flex-start;
                     }
-                    .popup-image { 
-                        max-width: 100%; 
-                        height: auto; 
-                        margin-bottom: 15px; 
+                    .popup-left {
+                        flex: 1;
+                        min-width: 200px;
+                        margin-right: 20px;
                     }
-                    .popup-close { 
-                        position: absolute; 
-                        top: 10px; 
-                        right: 15px; 
-                        font-size: 24px; 
-                        cursor: pointer; 
-                        color: #333; 
+                    .popup-right {
+                        flex: 1;
+                        min-width: 200px;
                     }
-                    @keyframes fade { 
-                        from { opacity: 0; } 
-                        to { opacity: 1; } 
+                    .popup-title {
+                        font-size: 28px;
+                        font-weight: bold;
+                        margin: 0 0 15px;
+                        color: #222;
+                        text-align: left;
+                        line-height: 1.2;
                     }
-                    @keyframes slide { 
-                        from { transform: translateY(-100%); } 
-                        to { transform: translateY(0); } 
+                    .popup-content {
+                        font-size: 16px;
+                        line-height: 1.6;
+                        color: #333;
+                        text-align: left;
+                        margin: 0;
                     }
-                    @keyframes zoom { 
-                        from { transform: scale(0); } 
-                        to { transform: scale(1); } 
+                    .popup-content img {
+                        max-width: 100%;
+                        height: auto;
+                        border-radius: 5px;
+                    }
+                    .popup-image {
+                        max-width: 100%;
+                        height: auto;
+                        display: block;
+                        margin: 0 0 15px;
+                        border-radius: 5px;
+                    }
+                    .popup-close {
+                        position: absolute;
+                        top: 15px;
+                        right: 20px;
+                        font-size: 30px;
+                        color: #555;
+                        cursor: pointer;
+                        transition: color 0.3s ease;
+                        line-height: 1;
+                    }
+                    .popup-close:hover {
+                        color: #000;
+                    }
+                    @media (max-width: 600px) {
+                        .popup-container {
+                            flex-direction: column;
+                        }
+                        .popup-left, .popup-right {
+                            margin-right: 0;
+                            min-width: 100%;
+                        }
+                    }
+                    @keyframes fade {
+                        from { opacity: 0; }
+                        to { opacity: 1; }
+                    }
+                    @keyframes slide {
+                        from { transform: translateY(-50%); }
+                        to { transform: translateY(0); }
+                    }
+                    @keyframes zoom {
+                        from { transform: scale(0.7); }
+                        to { transform: scale(1); }
+                    }
+                    .popup-container {
+                        animation: ' . htmlspecialchars($popup->animation ?: 'fade', ENT_QUOTES, 'UTF-8') . ' 0.5s ease-in-out;
                     }
                 </style>
             </head>
             <body>
-                <div class="popup-container" style="animation: ' . htmlspecialchars($popup->animation ?: 'fade', ENT_QUOTES, 'UTF-8') . ' 0.5s ease-in-out;">
-                    <span class="popup-close" onclick="window.close()">×</span>
-                    ' . ($popup->image && file_exists(_PS_ROOT_DIR_ . '/' . $popup->image) ? '<img src="' . __PS_BASE_URI__ . htmlspecialchars($popup->image, ENT_QUOTES, 'UTF-8') . '" class="popup-image" alt="Popup Image">' : '') . '
-                    <div class="popup-content">' . htmlspecialchars_decode($popup->content, ENT_QUOTES) . '</div>
+                <div class="popup-overlay">
+                    <div class="popup-container">
+                        <span class="popup-close" onclick="window.close()">×</span>
+                        <div class="popup-left">
+                            ' . ($popup->title ? '<h2 class="popup-title">' . htmlspecialchars($popup->title, ENT_QUOTES, 'UTF-8') . '</h2>' : '') . '
+                            ' . ($popup->image && file_exists(_PS_ROOT_DIR_ . '/' . $popup->image) ? '<img src="' . __PS_BASE_URI__ . htmlspecialchars($popup->image, ENT_QUOTES, 'UTF-8') . '" class="popup-image" alt="Popup Image">' : '') . '
+                        </div>
+                        <div class="popup-right">
+                            <div class="popup-content">' . htmlspecialchars_decode($popup->content, ENT_QUOTES) . '</div>
+                        </div>
+                    </div>
                 </div>
+                <script>
+                    document.addEventListener("DOMContentLoaded", function() {
+                        // Ensure popup is visible on load
+                        const overlay = document.querySelector(".popup-overlay");
+                        overlay.style.display = "flex";
+
+                        // Close popup on overlay click (outside popup-container)
+                        overlay.addEventListener("click", function(e) {
+                            if (e.target === overlay) {
+                                window.close();
+                            }
+                        });
+
+                        // Prevent clicks inside popup-container from closing the popup
+                        document.querySelector(".popup-container").addEventListener("click", function(e) {
+                            e.stopPropagation();
+                        });
+                    });
+                </script>
             </body>
             </html>';
 
@@ -353,7 +443,20 @@ class AdminCustomPopupController extends ModuleAdminController
             $popup->start_datetime = !empty($start) ? $start : null;
             $popup->end_datetime = !empty($end) ? $end : null;
 
-            $popup->display_pages = json_encode(Tools::getValue('display_pages'));
+            $raw_pages = Tools::getValue('display_pages');
+$normalized_pages = [];
+
+foreach ($raw_pages as $page) {
+    // Convert category_2 (Home) to 'home'
+    if ($page === 'category_2') {
+        $normalized_pages[] = 'home';
+    } else {
+        $normalized_pages[] = $page;
+    }
+}
+
+$popup->display_pages = json_encode($normalized_pages);
+
 
             if (isset($_FILES['image']) && is_uploaded_file($_FILES['image']['tmp_name'])) {
                 $image_path = 'modules/custompopup/views/img/' . basename($_FILES['image']['name']);

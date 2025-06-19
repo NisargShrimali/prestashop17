@@ -1,0 +1,38 @@
+#newsletterModal .modal-content {
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+#newsletterModal .modal-body {
+  padding: 1.5rem;
+}
+
+#newsletterModal .newsletter-form-wrapper form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+#newsletterModal input[type="email"] {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+#newsletterModal input[type="submit"],
+#newsletterModal button[name="submitNewsletter"] {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+
+#newsletterModal input[type="submit"]:hover,
+#newsletterModal button[name="submitNewsletter"]:hover {
+  background: #0056b3;
+}

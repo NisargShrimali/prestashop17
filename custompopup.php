@@ -6,6 +6,7 @@ if (!defined('_PS_VERSION_')) {
 
 require_once dirname(__FILE__) . '/classes/CustomPopupBanner.php';
 require_once dirname(__FILE__) . '/classes/CustomPopupInfo.php';
+require_once dirname(__FILE__) . '/classes/CustomPopupNewsletter.php';
 
 class CustomPopup extends Module
 {
@@ -40,6 +41,7 @@ class CustomPopup extends Module
             && $this->registerHook('displayBanner')
             && $this->registerHook('displayHeader')
             && $this->registerHook('displayFooter')
+            && $this->copyOverrideFile()
             && $this->installTab()
             && $this->fixDatabaseDates();
     }
@@ -87,14 +89,25 @@ class CustomPopup extends Module
             `display_pages` TEXT
         ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8mb4";
 
-        return $db->execute($query1) && $db->execute($query2);
+        $query3 = "CREATE TABLE IF NOT EXISTS `"._DB_PREFIX_."custompopup_newsletter` (
+            `id_custompopup_newsletter` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `active` TINYINT(1) NOT NULL DEFAULT 0,
+            `title` VARCHAR(255) NOT NULL,
+            `content` TEXT NOT NULL,
+            `button_text` VARCHAR(255) NOT NULL DEFAULT 'Subscribe',
+            `start_datetime` DATETIME NULL DEFAULT NULL,
+            `end_datetime` DATETIME NULL DEFAULT NULL
+        ) ENGINE="._MYSQL_ENGINE_." DEFAULT CHARSET=utf8mb4";
+
+        return $db->execute($query1) && $db->execute($query2) && $db->execute($query3);
     }
 
     protected function uninstallDB()
     {
         $db = Db::getInstance();
         return $db->execute("DROP TABLE IF EXISTS `"._DB_PREFIX_."custompopup_banner`")
-            && $db->execute("DROP TABLE IF EXISTS `"._DB_PREFIX_."custompopup_info`");
+            && $db->execute("DROP TABLE IF EXISTS `"._DB_PREFIX_."custompopup_info`")
+            && $db->execute("DROP TABLE IF EXISTS `"._DB_PREFIX_."custompopup_newsletter`");
     }
 
     protected function fixDatabaseDates()
@@ -114,6 +127,14 @@ class CustomPopup extends Module
             WHERE start_datetime = \'\' OR start_datetime = \'0000-00-00 00:00:00\'
         ') && $db->execute('
             UPDATE ' . _DB_PREFIX_ . 'custompopup_info
+            SET end_datetime = NULL
+            WHERE end_datetime = \'\' OR end_datetime = \'0000-00-00 00:00:00\'
+        ') && $db->execute('
+            UPDATE ' . _DB_PREFIX_ . 'custompopup_newsletter
+            SET start_datetime = NULL
+            WHERE start_datetime = \'\' OR start_datetime = \'0000-00-00 00:00:00\'
+        ') && $db->execute('
+            UPDATE ' . _DB_PREFIX_ . 'custompopup_newsletter
             SET end_datetime = NULL
             WHERE end_datetime = \'\' OR end_datetime = \'0000-00-00 00:00:00\'
         ');
@@ -140,6 +161,18 @@ class CustomPopup extends Module
             $tab = new Tab($id_tab);
             return $tab->delete();
         }
+        return true;
+    }
+
+    private function copyOverrideFile()
+    {
+        $source = _PS_MODULE_DIR_ . $this->name . '/override/modules/ps_emailsubscription/ps_emailsubscription.php';
+        $destination = _PS_ROOT_DIR_ . '/modules/ps_emailsubscription/ps_emailsubscription.php';
+
+        if (!file_exists($destination)) {
+            return copy($source, $destination);
+        }
+
         return true;
     }
 
@@ -193,58 +226,37 @@ class CustomPopup extends Module
 
         return $output;
     }
+public function hookDisplayFooter()
+{
+    PrestaShopLogger::addLog('hookDisplayFooter called', 1);
 
-    public function hookDisplayFooter()
-    {
-        PrestaShopLogger::addLog('hookDisplayFooter called', 1);
+    $now = new DateTime('now', new DateTimeZone('UTC'));
+    $current_page = $this->getCurrentPage();
+    $is_logged = $this->context->customer->isLogged();
 
-        $now = new DateTime('now', new DateTimeZone('UTC'));
-        $current_page = $this->getCurrentPage();
-        $is_logged = $this->context->customer->isLogged();
+    // === Load Info Popups ===
+    $query = (new DbQuery())
+        ->select('*')
+        ->from('custompopup_info')
+        ->where('active = 1');
+    $popups = Db::getInstance()->executeS($query);
 
-        $query = (new DbQuery())
-            ->select('*')
-            ->from('custompopup_info')
-            ->where('active = 1');
-        $popups = Db::getInstance()->executeS($query);
-
-        if (!$popups || !is_array($popups)) {
-            PrestaShopLogger::addLog('No active info popups found', 1);
-            return '';
-        }
-
-        $filtered_popups = [];
+    $filtered_popups = [];
+    if ($popups && is_array($popups)) {
         foreach ($popups as $popup_data) {
             $popup = new CustomPopupInfo((int)$popup_data['id_custompopup_info']);
             if (!Validate::isLoadedObject($popup)) {
-                PrestaShopLogger::addLog('Failed to load popup ID: ' . $popup_data['id_custompopup_info'], 3);
                 continue;
             }
-            PrestaShopLogger::addLog('Processing popup ID: ' . $popup->id, 1);
 
-            $start = null;
-            if ($popup->start_datetime) {
-                try {
-                    $start = new DateTime($popup->start_datetime, new DateTimeZone('UTC'));
-                } catch (Exception $e) {
-                    PrestaShopLogger::addLog('Invalid start_datetime for popup ID ' . $popup->id . ': ' . $popup->start_datetime, 3);
-                }
-            }
-            $end = null;
-            if ($popup->end_datetime) {
-                try {
-                    $end = new DateTime($popup->end_datetime, new DateTimeZone('UTC'));
-                } catch (Exception $e) {
-                    PrestaShopLogger::addLog('Invalid end_datetime for popup ID ' . $popup->id . ': ' . $popup->end_datetime, 3);
-                }
-            }
+            $start = $popup->start_datetime ? new DateTime($popup->start_datetime, new DateTimeZone('UTC')) : null;
+            $end = $popup->end_datetime ? new DateTime($popup->end_datetime, new DateTimeZone('UTC')) : null;
+
             if (($start && $now < $start) || ($end && $now > $end)) {
-                PrestaShopLogger::addLog('Popup ID ' . $popup->id . ' skipped due to schedule', 1);
                 continue;
             }
 
             if ($popup->audience && !$is_logged) {
-                PrestaShopLogger::addLog('Popup ID ' . $popup->id . ' skipped due to audience (not logged in)', 1);
                 continue;
             }
 
@@ -261,7 +273,6 @@ class CustomPopup extends Module
                     }
                 }
                 if (!$page_match) {
-                    PrestaShopLogger::addLog('Popup ID ' . $popup->id . ' skipped due to page mismatch', 1);
                     continue;
                 }
             }
@@ -279,24 +290,81 @@ class CustomPopup extends Module
                 'trigger_value' => $popup->trigger_value ?: '',
                 'display_frequency' => $popup->display_frequency ?: 'always',
                 'frequency_value' => (int)$popup->frequency_value,
+                'popup_type' => 'info',
             ];
         }
+    }
 
-        if (empty($filtered_popups)) {
-            PrestaShopLogger::addLog('No popups matched after filtering', 1);
-            return '';
+    // === Load Newsletter Config ===
+    $newsletter_query = (new DbQuery())
+        ->select('*')
+        ->from('custompopup_newsletter')
+        ->where('active = 1');
+    $newsletters = Db::getInstance()->executeS($newsletter_query);
+
+    $filtered_newsletters = [];
+    if ($newsletters && is_array($newsletters)) {
+        foreach ($newsletters as $newsletter_data) {
+            $newsletter = new CustomPopupNewsletter((int)$newsletter_data['id_custompopup_newsletter']);
+            if (!Validate::isLoadedObject($newsletter)) {
+                continue;
+            }
+
+            $start = $newsletter->start_datetime ? new DateTime($newsletter->start_datetime, new DateTimeZone('UTC')) : null;
+            $end = $newsletter->end_datetime ? new DateTime($newsletter->end_datetime, new DateTimeZone('UTC')) : null;
+
+            if (($start && $now < $start) || ($end && $now > $end)) {
+                continue;
+            }
+
+            $filtered_newsletters[] = [
+                'id' => $newsletter->id,
+                'title' => $newsletter->title,
+                'content' => $newsletter->content,
+                'button_text' => $newsletter->button_text,
+            ];
         }
+    }
+
+    // === Assign to Smarty ===
+    if (!empty($filtered_newsletters)) {
+        $newsletter = $filtered_newsletters[0]; // Only using the first active one
 
         $this->context->smarty->assign([
-            'popups' => $filtered_popups,
-            'module_dir' => $this->_path,
+            'custom_newsletter_title' => $newsletter['title'],
+            'custom_newsletter_content' => $newsletter['content'],
+            'custom_newsletter_button' => $newsletter['button_text'],
         ]);
 
-        PrestaShopLogger::addLog('Rendering info popup template with ' . count($filtered_popups) . ' popups', 1);
-        $output = $this->display(__FILE__, 'views/templates/hook/info_popup.tpl');
-        $output .= '<div style="height: 3000px; background: #f0f0f0;">Test Scroll Content</div>';
-        return $output;
+        // Assign required vars for ps_emailsubscription template
+        $this->context->smarty->assign([
+            'value' => '',
+            'conditions' => '',
+            'msg' => '',
+            'nw_error' => false,
+            'hookName' => 'displayNewsletterRegistration',
+            'id_module' => Module::getModuleIdByName('ps_emailsubscription'),
+        ]);
     }
+
+    $this->context->smarty->assign([
+        'popups' => $filtered_popups,
+        'newsletters' => $filtered_newsletters,
+        'module_dir' => $this->_path,
+        'link' => $this->context->link,
+    ]);
+
+    // === Render both popup templates ===
+    $output = '';
+    if (!empty($filtered_popups)) {
+        $output .= $this->display(__FILE__, 'views/templates/hook/info_popup.tpl');
+    }
+    if (!empty($filtered_newsletters)) {
+        $output .= $this->display(__FILE__, 'views/templates/hook/newsletter_popup.tpl');
+    }
+
+    return $output;
+}
 
     public function hookDisplayHeader()
     {
@@ -316,71 +384,139 @@ class CustomPopup extends Module
                 'modules/' . $this->name . '/views/css/animate.min.css',
                 ['media' => 'all', 'priority' => 80]
             );
+
+            $this->context->controller->registerStylesheet(
+                'custompopup-newsletter',
+                'modules/'.$this->name.'/views/css/newsletter.css',
+                ['media' => 'all', 'priority' => 150]
+            );
+
+            $this->context->controller->registerJavascript(
+                'module-custompopup-logic',
+                'modules/'.$this->name.'/views/js/newsletter.js',
+                ['position' => 'bottom', 'priority' => 150]
+            );
+
+            Media::addJsDef([
+            'custompopup_logged_in' => $this->context->customer->isLogged(),
+            'custompopup_newsletter_enabled' => (bool)Configuration::get('CUSTOMPOPUP_NEWSLETTER_ENABLED'),
+            'custompopup_reappear_hours' => (int)Configuration::get('CUSTOMPOPUP_NEWSLETTER_HOURS'),
+        ]);
         }
     }
 
-    public function getContent()
-    {
-        $output = '';
-        $banner = $this->getOrCreateBanner();
+   public function getContent()
+{
+    $output = '';
+    $banner = $this->getOrCreateBanner();
+    $newsletter = $this->getOrCreateNewsletter();
 
-        if (Tools::isSubmit('submit_custompopup_banner')) {
-            $errors = [];
-            $backgroundColor = Tools::getValue('background_color');
-            $fontColor = Tools::getValue('font_color');
-            $content = Tools::getValue('content');
-            $startDatetime = Tools::getValue('start_datetime');
-            $endDatetime = Tools::getValue('end_datetime');
+    if (Tools::isSubmit('submit_custompopup_banner')) {
+        $errors = [];
+        $backgroundColor = Tools::getValue('background_color');
+        $fontColor = Tools::getValue('font_color');
+        $content = Tools::getValue('content');
+        $startDatetime = Tools::getValue('start_datetime');
+        $endDatetime = Tools::getValue('end_datetime');
 
-            if (empty($backgroundColor)) {
-                $errors[] = $this->l('Background color is required.');
-            } elseif (!Validate::isColor($backgroundColor)) {
-                $errors[] = $this->l('Please enter a valid background color.');
-            }
+        if (empty($backgroundColor)) {
+            $errors[] = $this->l('Background color is required.');
+        } elseif (!Validate::isColor($backgroundColor)) {
+            $errors[] = $this->l('Please enter a valid background color.');
+        }
 
-            if (empty($fontColor)) {
-                $errors[] = $this->l('Font color is required.');
-            } elseif (!Validate::isColor($fontColor)) {
-                $errors[] = $this->l('Please enter a valid font color.');
-            }
+        if (empty($fontColor)) {
+            $errors[] = $this->l('Font color is required.');
+        } elseif (!Validate::isColor($fontColor)) {
+            $errors[] = $this->l('Please enter a valid font color.');
+        }
 
-            if (empty($content)) {
-                $errors[] = $this->l('Banner content is required.');
-            }
+        if (empty($content)) {
+            $errors[] = $this->l('Banner content is required.');
+        }
 
-            if (!empty($startDatetime) && !Validate::isDateFormat($startDatetime)) {
-                $errors[] = $this->l('The start date format is invalid.');
-            }
+        if (!empty($startDatetime) && !Validate::isDateFormat($startDatetime)) {
+            $errors[] = $this->l('The start date format is invalid.');
+        }
 
-            if (!empty($endDatetime) && !Validate::isDateFormat($endDatetime)) {
-                $errors[] = $this->l('The end date format is invalid.');
-            }
+        if (!empty($endDatetime) && !Validate::isDateFormat($endDatetime)) {
+            $errors[] = $this->l('The end date format is invalid.');
+        }
 
-            if (count($errors) === 0) {
-                $banner->active = (int)Tools::getValue('active');
-                $banner->closable = (int)Tools::getValue('closable');
-                $banner->background_color = $backgroundColor;
-                $banner->font_color = $fontColor;
-                $banner->marquee = (int)Tools::getValue('marquee');
-                $banner->content = $content;
+        if (count($errors) === 0) {
+            $banner->active = (int)Tools::getValue('active');
+            $banner->closable = (int)Tools::getValue('closable');
+            $banner->background_color = $backgroundColor;
+            $banner->font_color = $fontColor;
+            $banner->marquee = (int)Tools::getValue('marquee');
+            $banner->content = $content;
 
-                $timezone = new DateTimeZone('Asia/Kolkata');
-                $utc = new DateTimeZone('UTC');
-                $banner->start_datetime = $startDatetime ? (new DateTime($startDatetime, $timezone))->setTimezone($utc)->format('Y-m-d H:i:s') : null;
-                $banner->end_datetime = $endDatetime ? (new DateTime($endDatetime, $timezone))->setTimezone($utc)->format('Y-m-d H:i:s') : null;
+            $timezone = new DateTimeZone('Asia/Kolkata');
+            $utc = new DateTimeZone('UTC');
+            $banner->start_datetime = $startDatetime ? (new DateTime($startDatetime, $timezone))->setTimezone($utc)->format('Y-m-d H:i:s') : null;
+            $banner->end_datetime = $endDatetime ? (new DateTime($endDatetime, $timezone))->setTimezone($utc)->format('Y-m-d H:i:s') : null;
 
-                if ($banner->save()) {
-                    $output .= $this->displayConfirmation($this->l('Banner settings have been updated.'));
-                } else {
-                    $output .= $this->displayError($this->l('Could not update the banner settings.'));
-                }
+            if ($banner->save()) {
+                $output .= $this->displayConfirmation($this->l('Banner settings have been updated.'));
             } else {
-                $output .= $this->displayError($errors);
+                $output .= $this->displayError($this->l('Could not update the banner settings.'));
             }
+        } else {
+            $output .= $this->displayError($errors);
+        }
+    }
+
+    if (Tools::isSubmit('submit_custompopup_newsletter')) {
+        $errors = [];
+        $title = Tools::getValue('title');
+        $content = Tools::getValue('content');
+        $buttonText = Tools::getValue('button_text');
+        $startDatetime = Tools::getValue('start_datetime');
+        $endDatetime = Tools::getValue('end_datetime');
+
+        if (empty($title)) {
+            $errors[] = $this->l('Title is required.');
         }
 
-        return $output . $this->renderForm($banner);
+        if (empty($content)) {
+            $errors[] = $this->l('Content is required.');
+        }
+
+        if (empty($buttonText)) {
+            $errors[] = $this->l('Button text is required.');
+        }
+
+        if (!empty($startDatetime) && !Validate::isDateFormat($startDatetime)) {
+            $errors[] = $this->l('The start date format is invalid.');
+        }
+
+        if (!empty($endDatetime) && !Validate::isDateFormat($endDatetime)) {
+            $errors[] = $this->l('The end date format is invalid.');
+        }
+
+        if (count($errors) === 0) {
+            $newsletter->active = (int)Tools::getValue('active');
+            $newsletter->title = $title;
+            $newsletter->content = $content;
+            $newsletter->button_text = $buttonText;
+
+            $timezone = new DateTimeZone('Asia/Kolkata');
+            $utc = new DateTimeZone('UTC');
+            $newsletter->start_datetime = $startDatetime ? (new DateTime($startDatetime, $timezone))->setTimezone($utc)->format('Y-m-d H:i:s') : null;
+            $newsletter->end_datetime = $endDatetime ? (new DateTime($endDatetime, $timezone))->setTimezone($utc)->format('Y-m-d H:i:s') : null;
+
+            if ($newsletter->save()) {
+                $output .= $this->displayConfirmation($this->l('Newsletter settings have been updated.'));
+            } else {
+                $output .= $this->displayError($this->l('Could not update the newsletter settings.'));
+            }
+        } else {
+            $output .= $this->displayError($errors);
+        }
     }
+
+    return $output . $this->renderForm($banner) . $this->renderNewsletterForm($newsletter);
+}
 
     public function getOrCreateBanner()
     {
@@ -404,6 +540,32 @@ class CustomPopup extends Module
         $banner->add();
 
         return $banner;
+    }
+
+    public function getOrCreateNewsletter()
+    {
+        if (!class_exists('CustomPopupNewsletter')) {
+            die('Class CustomPopupNewsletter not found. Check the file path or contents of classes/CustomPopupNewsletter.php');
+        }
+
+        $id = Db::getInstance()->getValue(
+            (new DbQuery())
+                ->select('id_custompopup_newsletter')
+                ->from('custompopup_newsletter')
+        );
+
+        if ($id) {
+            return new CustomPopupNewsletter((int)$id);
+        }
+
+        $newsletter = new CustomPopupNewsletter();
+        $newsletter->active = 0;
+        $newsletter->title = 'Subscribe to Our Newsletter';
+        $newsletter->content = 'Stay updated with our latest offers and news!';
+        $newsletter->button_text = 'Subscribe';
+        $newsletter->add();
+
+        return $newsletter;
     }
 
     protected function getCurrentPage()
@@ -546,6 +708,115 @@ class CustomPopup extends Module
             'font_color' => $banner->font_color,
             'marquee' => $banner->marquee,
             'content' => $banner->content,
+            'start_datetime' => $start_local,
+            'end_datetime' => $end_local,
+        ];
+
+        return $helper->generateForm([$fields_form]);
+    }
+
+    public function renderNewsletterForm($newsletter)
+    {
+        $default_lang = (int)Configuration::get('PS_LANG_DEFAULT');
+
+        $fields_form = [
+            'form' => [
+                'legend' => ['title' => $this->l('Newsletter Popup Settings')],
+                'input' => [
+                    [
+                        'type' => 'switch',
+                        'label' => $this->l('Active'),
+                        'name' => 'active',
+                        'is_bool' => true,
+                        'values' => [
+                            ['id' => 'on', 'value' => 1, 'label' => $this->l('Yes')],
+                            ['id' => 'off', 'value' => 0, 'label' => $this->l('No')],
+                        ],
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => $this->l('Title'),
+                        'name' => 'title',
+                        'required' => true,
+                    ],
+                    [
+                        'type' => 'textarea',
+                        'label' => $this->l('Content'),
+                        'name' => 'content',
+                        'autoload_rte' => true,
+                        'required' => true,
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => $this->l('Button Text'),
+                        'name' => 'button_text',
+                        'required' => true,
+                    ],
+                    [
+                        'type' => 'datetime',
+                        'label' => $this->l('Start Date & Time'),
+                        'name' => 'start_datetime',
+                        'required' => false,
+                        'desc' => 'Select when the newsletter popup should start displaying.',
+                        'class' => 'fixed-width-xl datetimepicker'
+                    ],
+                    [
+                        'type' => 'datetime',
+                        'name' => 'end_datetime',
+                        'label' => $this->l('End Date & Time'),
+                        'required' => false,
+                        'desc' => 'Select when the newsletter popup should stop displaying.',
+                        'class' => 'fixed-width-xl datetimepicker'
+                    ],
+                ],
+                'submit' => [
+                    'title' => $this->l('Save Newsletter Popup'),
+                    'name' => 'submit_custompopup_newsletter',
+                    'class' => 'btn btn-default pull-right',
+                ]
+            ]
+        ];
+
+        $helper = new HelperForm();
+        $helper->module = $this;
+        $helper->name_controller = $this->name;
+        $helper->token = Tools::getAdminTokenLite('AdminModules');
+        $helper->currentIndex = AdminController::$currentIndex . '&configure=' . $this->name;
+        $helper->default_form_language = $default_lang;
+        $helper->allow_employee_form_lang = $default_lang;
+        $helper->title = $this->displayName;
+        $helper->show_toolbar = true;
+        $helper->submit_action = 'submit_custompopup_newsletter';
+
+        $start_local = '';
+        if (isset($newsletter->start_datetime)) {
+            try {
+                $start_local = (new DateTime($newsletter->start_datetime, new DateTimeZone('UTC')))
+                    ->setTimezone(new DateTimeZone('Asia/Kolkata'))
+                    ->format('Y-m-d H:i:s');
+            } catch (Exception $e) {
+                PrestaShopLogger::addLog('Invalid start_datetime for newsletter: ' . $newsletter->start_datetime, 3);
+                $start_local = '';
+            }
+        }
+
+        $end_local = '';
+        if (isset($newsletter->end_datetime)) {
+            try {
+                $end_local = (new DateTime($newsletter->end_datetime, new DateTimeZone('UTC')))
+                    ->setTimezone(new DateTimeZone('Asia/Kolkata'))
+                    ->format('Y-m-d H:i:s');
+            } catch (Exception $e) {
+                PrestaShopLogger::addLog('Invalid end_datetime for newsletter: ' . $newsletter->end_datetime, 3);
+                $end_local = '';
+            }
+        }
+
+        $helper->fields_value = [
+            'active' => isset($newsletter->active) ? $newsletter->active : 0,
+            'title' => isset($newsletter->title) ? $newsletter->title : '',
+            'content' => isset($newsletter->content) ? $newsletter->content : '',
+            'button_text' => isset($newsletter->button_text) ? $newsletter->button_text : 'Subscribe',
             'start_datetime' => $start_local,
             'end_datetime' => $end_local,
         ];
